@@ -133,6 +133,24 @@ class Rule:
             If given, it must be either an integer, or a sequence of
             integers, meaning the seconds to apply the recurrence to.
     """
+    bysetpos: int | Sequence[int]
+
+    bymonth: int | Sequence[int]
+
+    bymonthday: int | Sequence[int]
+
+    byyearday: int | Sequence[int]
+
+    byweekno: int | Sequence[int]
+
+    byday: int | Sequence[int]
+
+    byhour: int | Sequence[int]
+
+    byminute: int | Sequence[int]
+
+    bysecond: int | Sequence[int]
+
     byparams = (
         'bysetpos', 'bymonth', 'bymonthday', 'byyearday',
         'byweekno', 'byday', 'byhour', 'byminute', 'bysecond'
