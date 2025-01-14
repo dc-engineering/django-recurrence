@@ -137,7 +137,7 @@ class Rule:
 
     bymonth: int | Sequence[int]
 
-    bymonthday: int | Sequence[int]
+    bymonthday: int | list[int]
 
     byyearday: int | Sequence[int]
 
