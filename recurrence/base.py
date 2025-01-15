@@ -15,6 +15,7 @@ import calendar
 
 import dateutil.rrule
 from dateutil import tz
+from typing import Sequence
 
 from django.utils import dateformat
 from django.utils.timezone import get_current_timezone, is_aware, is_naive, make_aware
