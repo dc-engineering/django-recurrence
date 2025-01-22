@@ -206,6 +206,8 @@ class Rule:
             tuple(byparam_values)))
 
     def __eq__(self, other):
+        if type(other) != type(self):
+            return False
         if not isinstance(other, Rule):
             raise TypeError('object to compare must be Rule object')
         return hash(self) == hash(other)
