@@ -9,25 +9,36 @@ parameter. Also, the `byweekday` parameter in `dateutil.rrule` is
 and `Recurrence` class documentation for details on the differences.
 """
 
-import re
-import datetime
 import calendar
+import datetime
+import re
+from collections.abc import Sequence
 
 import dateutil.rrule
 from dateutil import tz
-from typing import Sequence
-
 from django.utils import dateformat
 from django.utils.timezone import get_current_timezone, is_aware, is_naive, make_aware
-from django.utils.translation import gettext as _, pgettext as _p
+from django.utils.translation import gettext as _
+from django.utils.translation import pgettext as _p
 
-from recurrence import exceptions
-from recurrence import settings
+from recurrence import exceptions, settings
 
 YEARLY, MONTHLY, WEEKLY, DAILY, HOURLY, MINUTELY, SECONDLY = range(7)
 
-(JANUARY, FEBRUARY, MARCH, APRIL, MAY, JUNE, JULY, AUGUST,
- SEPTEMBER, OCTOBER, NOVEMBER, DECEMBER) = range(1, 13)
+(
+    JANUARY,
+    FEBRUARY,
+    MARCH,
+    APRIL,
+    MAY,
+    JUNE,
+    JULY,
+    AUGUST,
+    SEPTEMBER,
+    OCTOBER,
+    NOVEMBER,
+    DECEMBER,
+) = range(1, 13)
 
 
 class Rule:
@@ -134,6 +145,7 @@ class Rule:
             If given, it must be either an integer, or a sequence of
             integers, meaning the seconds to apply the recurrence to.
     """
+
     bysetpos: int | Sequence[int]
 
     bymonth: int | Sequence[int]
@@ -153,21 +165,36 @@ class Rule:
     bysecond: int | Sequence[int]
 
     byparams = (
-        'bysetpos', 'bymonth', 'bymonthday', 'byyearday',
-        'byweekno', 'byday', 'byhour', 'byminute', 'bysecond'
+        "bysetpos",
+        "bymonth",
+        "bymonthday",
+        "byyearday",
+        "byweekno",
+        "byday",
+        "byhour",
+        "byminute",
+        "bysecond",
     )
     frequencies = (
-        'YEARLY', 'MONTHLY', 'WEEKLY', 'DAILY',
-        'HOURLY', 'MINUTELY', 'SECONDLY'
+        "YEARLY",
+        "MONTHLY",
+        "WEEKLY",
+        "DAILY",
+        "HOURLY",
+        "MINUTELY",
+        "SECONDLY",
     )
-    weekdays = (
-        'MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'
-    )
+    weekdays = ("MO", "TU", "WE", "TH", "FR", "SA", "SU")
     firstweekday = calendar.firstweekday()
 
     def __init__(
-        self, freq,
-        interval=1, wkst=None, count=None, until=None, **kwargs
+        self,
+        freq: int,
+        interval: int = 1,
+        wkst: int | None = None,
+        count: int | None = None,
+        until: datetime.datetime | None = None,
+        **kwargs,
     ):
         """
         Create a new rule.
@@ -184,7 +211,7 @@ class Rule:
         for param in self.byparams:
             if param in kwargs:
                 value = kwargs[param]
-                if hasattr(value, '__iter__'):
+                if hasattr(value, "__iter__"):
                     value = list(value)
                     if not value:
                         value = []
@@ -201,15 +228,22 @@ class Rule:
         for param in self.byparams:
             byparam_values.append(param)
             byparam_values.extend(getattr(self, param, []) or [])
-        return hash((
-            self.freq, self.interval, self.wkst, self.count, self.until,
-            tuple(byparam_values)))
+        return hash(
+            (
+                self.freq,
+                self.interval,
+                self.wkst,
+                self.count,
+                self.until,
+                tuple(byparam_values),
+            )
+        )
 
     def __eq__(self, other):
         if type(other) != type(self):
             return False
         if not isinstance(other, Rule):
-            raise TypeError('object to compare must be Rule object')
+            raise TypeError("object to compare must be Rule object")
         return hash(self) == hash(other)
 
     def __ne__(self, other):
@@ -245,7 +279,7 @@ class Rule:
         kwargs = dict((p, getattr(self, p) or None) for p in self.byparams)
         # dateutil.rrule renames the parameter 'byweekday' by we're using
         # the parameter name originally specified by rfc2445.
-        kwargs['byweekday'] = kwargs.pop('byday')
+        kwargs["byweekday"] = kwargs.pop("byday")
 
         until = self.until
         if until:
@@ -257,8 +291,15 @@ class Rule:
             until = dtend
 
         return dateutil.rrule.rrule(
-            self.freq, dtstart, self.interval, self.wkst, self.count, until,
-            cache=cache, **kwargs)
+            self.freq,
+            dtstart,
+            self.interval,
+            self.wkst,
+            self.count,
+            until,
+            cache=cache,
+            **kwargs,
+        )
 
 
 class Recurrence:
@@ -313,9 +354,16 @@ class Recurrence:
             With `include_dtstart == False` `dtstart` is only the rule's
             starting point like in python's `dateutil.rrule`.
     """
+
     def __init__(
-        self, dtstart=None, dtend=None, rrules=(), exrules=(),
-            rdates=(), exdates=(), include_dtstart=True
+        self,
+        dtstart: datetime.datetime | None = None,
+        dtend: datetime.datetime | None = None,
+        rrules: list[Rule] | None = None,
+        exrules: list[Rule] | None = None,
+        rdates: list[datetime.datetime] | None = None,
+        exdates: list[datetime.datetime] | None = None,
+        include_dtstart: bool = True,
     ):
         """
         Create a new recurrence.
@@ -323,15 +371,24 @@ class Recurrence:
         Parameters map directly to instance attributes, see
         `Recurrence` class documentation for usage.
         """
+        if rrules is None:
+            rrules = []
+        if exrules is None:
+            exrules = []
+        if rdates is None:
+            rdates = []
+        if exdates is None:
+            exdates = []
+
         self._cache = {}
 
         self.dtstart = dtstart
         self.dtend = dtend
 
-        self.rrules = list(rrules)
-        self.exrules = list(exrules)
-        self.rdates = list(rdates)
-        self.exdates = list(exdates)
+        self.rrules = rrules
+        self.exrules = exrules
+        self.rdates = rdates
+        self.exdates = exdates
         self.include_dtstart = include_dtstart
 
     def __iter__(self):
@@ -341,15 +398,26 @@ class Recurrence:
         return serialize(self)
 
     def __hash__(self):
-        return hash((
-            self.dtstart, self.dtend,
-            tuple(self.rrules), tuple(self.exrules),
-            tuple(self.rdates), tuple(self.exdates)))
+        return hash(
+            (
+                self.dtstart,
+                self.dtend,
+                tuple(self.rrules),
+                tuple(self.exrules),
+                tuple(self.rdates),
+                tuple(self.exdates),
+            )
+        )
 
     def __bool__(self):
-        if (self.dtstart or self.dtend or
-            tuple(self.rrules) or tuple(self.exrules) or
-            tuple(self.rdates) or tuple(self.exdates)):
+        if (
+            self.dtstart
+            or self.dtend
+            or tuple(self.rrules)
+            or tuple(self.exrules)
+            or tuple(self.rdates)
+            or tuple(self.exdates)
+        ):
             return True
         else:
             return False
@@ -362,14 +430,17 @@ class Recurrence:
         if type(other) != type(self):
             return False
         if not isinstance(other, Recurrence):
-            raise TypeError('object to compare must be Recurrence object')
+            raise TypeError("object to compare must be Recurrence object")
         return hash(self) == hash(other)
 
     def __ne__(self, other):
         return not self.__eq__(other)
 
     def occurrences(
-        self, dtstart=None, dtend=None, cache=False
+        self,
+        dtstart: datetime.datetime | None = None,
+        dtend: datetime.datetime | None = None,
+        cache: bool = False,
     ):
         """
         Get a generator yielding `datetime.datetime` instances in this
@@ -417,10 +488,7 @@ class Recurrence:
         """
         return self.to_dateutil_rruleset(dtstart, dtend, cache).count()
 
-    def before(
-        self, dt, inc=False,
-        dtstart=None, dtend=None, cache=False
-    ):
+    def before(self, dt, inc=False, dtstart=None, dtend=None, cache=False):
         """
         Returns the last recurrence before the given
         `datetime.datetime` instance.
@@ -450,13 +518,9 @@ class Recurrence:
         :Returns:
             A `datetime.datetime` instance.
         """
-        return self.to_dateutil_rruleset(
-            dtstart, dtend, cache).before(dt, inc)
+        return self.to_dateutil_rruleset(dtstart, dtend, cache).before(dt, inc)
 
-    def after(
-        self, dt, inc=False,
-        dtstart=None, dtend=None, cache=False
-    ):
+    def after(self, dt, inc=False, dtstart=None, dtend=None, cache=False):
         """
         Returns the first recurrence after the given
         `datetime.datetime` instance.
@@ -488,10 +552,7 @@ class Recurrence:
         """
         return self.to_dateutil_rruleset(dtstart, dtend, cache).after(dt, inc)
 
-    def between(
-        self, after, before,
-        inc=False, dtstart=None, dtend=None, cache=False
-    ):
+    def between(self, after, before, inc=False, dtstart=None, dtend=None, cache=False):
         """
         Returns the first recurrence after the given
         `datetime.datetime` instance.
@@ -525,8 +586,9 @@ class Recurrence:
         :Returns:
             A sequence of `datetime.datetime` instances.
         """
-        return self.to_dateutil_rruleset(
-            dtstart, dtend, cache).between(after, before, inc)
+        return self.to_dateutil_rruleset(dtstart, dtend, cache).between(
+            after, before, inc
+        )
 
     def to_dateutil_rruleset(self, dtstart=None, dtend=None, cache=False):
         """
@@ -585,18 +647,14 @@ class Recurrence:
             rruleset.rdate(dtstart)
         for rdate in self.rdates:
             rdate = normalize_offset_awareness(rdate, dtstart)
-            if dtend is not None and rdate < dtend:
-                rruleset.rdate(rdate)
-            elif not dtend:
+            if dtend is not None and rdate < dtend or not dtend:
                 rruleset.rdate(rdate)
         if dtend is not None:
             rruleset.rdate(dtend)
 
         for exdate in self.exdates:
             exdate = normalize_offset_awareness(exdate, dtstart)
-            if dtend is not None and exdate < dtend:
-                rruleset.exdate(exdate)
-            elif not dtend:
+            if dtend is not None and exdate < dtend or not dtend:
                 rruleset.exdate(exdate)
 
         if cache:
@@ -623,6 +681,7 @@ class Weekday:
     integers, other `Weekday` objects, and string constants as defined
     by rfc2445, such as '-1SU'.
     """
+
     def __init__(self, number, index=None):
         """
         Create a new weekday constant.
@@ -638,7 +697,7 @@ class Weekday:
         int(number)
 
         if number > 6:
-            raise ValueError('number must be in range(7)')
+            raise ValueError("number must be in range(7)")
         self.number = number
         self.index = index
 
@@ -660,7 +719,7 @@ class Weekday:
 
     def __repr__(self):
         if self.index:
-            return '%s%s' % (self.index, Rule.weekdays[self.number])
+            return "%s%s" % (self.index, Rule.weekdays[self.number])
         else:
             return Rule.weekdays[self.number]
 
@@ -669,7 +728,14 @@ class Weekday:
 
 
 MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY = (
-    MO, TU, WE, TH, FR, SA, SU) = WEEKDAYS = list(map(lambda n: Weekday(n), range(7)))
+    MO,
+    TU,
+    WE,
+    TH,
+    FR,
+    SA,
+    SU,
+) = WEEKDAYS = list(map(lambda n: Weekday(n), range(7)))
 
 
 def to_utc(dt):
@@ -727,13 +793,13 @@ def validate(rule_or_recurrence):
         obj = rule_or_recurrence
     try:
         if not isinstance(obj, Rule) and not isinstance(obj, Recurrence):
-            raise exceptions.ValidationError('incompatible object')
+            raise exceptions.ValidationError("incompatible object")
     except TypeError:
-        raise exceptions.ValidationError('incompatible object')
+        raise exceptions.ValidationError("incompatible object")
 
     def validate_dt(dt):
         if not isinstance(dt, datetime.datetime):
-            raise exceptions.ValidationError('invalid datetime: %r' % dt)
+            raise exceptions.ValidationError("invalid datetime: %r" % dt)
 
     def validate_iterable(rule, param):
         try:
@@ -742,8 +808,7 @@ def validate(rule_or_recurrence):
             # TODO: I'm not sure it's possible to get here - all the
             # places we call validate_iterable convert single ints to
             # sequences, and other types raise TypeErrors earlier.
-            raise exceptions.ValidationError(
-                '%s parameter must be iterable' % param)
+            raise exceptions.ValidationError("%s parameter must be iterable" % param)
 
     def validate_iterable_ints(rule, param, min_value=None, max_value=None):
         for value in getattr(rule, param, []):
@@ -757,18 +822,17 @@ def validate(rule_or_recurrence):
                         raise ValueError
             except ValueError:
                 raise exceptions.ValidationError(
-                    'invalid %s parameter: %r' % (param, value))
+                    "invalid %s parameter: %r" % (param, value)
+                )
 
     def validate_rule(rule):
         # validate freq
         try:
             Rule.frequencies[int(rule.freq)]
         except IndexError:
-            raise exceptions.ValidationError(
-                'invalid freq parameter: %r' % rule.freq)
+            raise exceptions.ValidationError("invalid freq parameter: %r" % rule.freq)
         except ValueError:
-            raise exceptions.ValidationError(
-                'invalid freq parameter: %r' % rule.freq)
+            raise exceptions.ValidationError("invalid freq parameter: %r" % rule.freq)
 
         # validate interval
         try:
@@ -777,7 +841,8 @@ def validate(rule_or_recurrence):
                 raise ValueError
         except ValueError:
             raise exceptions.ValidationError(
-                'invalid interval parameter: %r' % rule.interval)
+                "invalid interval parameter: %r" % rule.interval
+            )
 
         # validate wkst
         if rule.wkst:
@@ -785,7 +850,8 @@ def validate(rule_or_recurrence):
                 to_weekday(rule.wkst)
             except ValueError:
                 raise exceptions.ValidationError(
-                    'invalide wkst parameter: %r' % rule.wkst)
+                    "invalide wkst parameter: %r" % rule.wkst
+                )
 
         # validate until
         if rule.until:
@@ -795,7 +861,8 @@ def validate(rule_or_recurrence):
                 # TODO: I'm not sure it's possible to get here
                 # (validate_dt doesn't raise ValueError)
                 raise exceptions.ValidationError(
-                    'invalid until parameter: %r' % rule.until)
+                    "invalid until parameter: %r" % rule.until
+                )
 
         # validate count
         if rule.count:
@@ -803,7 +870,8 @@ def validate(rule_or_recurrence):
                 int(rule.count)
             except ValueError:
                 raise exceptions.ValidationError(
-                    'invalid count parameter: %r' % rule.count)
+                    "invalid count parameter: %r" % rule.count
+                )
 
         # TODO: Should we check that you haven't specified both
         # rule.count and rule.until? Note that we only serialize
@@ -812,22 +880,21 @@ def validate(rule_or_recurrence):
         # validate byparams
         for param in Rule.byparams:
             validate_iterable(rule, param)
-            if param == 'byday':
-                for value in getattr(rule, 'byday', []):
+            if param == "byday":
+                for value in getattr(rule, "byday", []):
                     try:
                         to_weekday(value)
                     except ValueError:
                         raise exceptions.ValidationError(
-                            'invalid byday parameter: %r' % value)
-            elif param == 'bymonth':
+                            "invalid byday parameter: %r" % value
+                        )
+            elif param == "bymonth":
                 validate_iterable_ints(rule, param, 1, 12)
-            elif param == 'bymonthday':
+            elif param == "bymonthday":
                 validate_iterable_ints(rule, param, -4, 31)
-            elif param == 'byhour':
+            elif param == "byhour":
                 validate_iterable_ints(rule, param, 0, 23)
-            elif param == 'byminute':
-                validate_iterable_ints(rule, param, 0, 59)
-            elif param == 'bysecond':
+            elif param == "byminute" or param == "bysecond":
                 validate_iterable_ints(rule, param, 0, 59)
             else:
                 validate_iterable_ints(rule, param)
@@ -860,30 +927,33 @@ def serialize(rule_or_recurrence):
     :Returns:
         A rfc2445 formatted unicode string.
     """
+
     def serialize_dt(dt):
         dt = to_utc(dt)
-        return u'%s%s%sT%s%s%sZ' % (
-            str(dt.year).rjust(4, '0'),
-            str(dt.month).rjust(2, '0'),
-            str(dt.day).rjust(2, '0'),
-            str(dt.hour).rjust(2, '0'),
-            str(dt.minute).rjust(2, '0'),
-            str(dt.second).rjust(2, '0'),
+        return "%s%s%sT%s%s%sZ" % (
+            str(dt.year).rjust(4, "0"),
+            str(dt.month).rjust(2, "0"),
+            str(dt.day).rjust(2, "0"),
+            str(dt.hour).rjust(2, "0"),
+            str(dt.minute).rjust(2, "0"),
+            str(dt.second).rjust(2, "0"),
         )
 
     def serialize_rule(rule):
         values = []
-        values.append((u'FREQ', [Rule.frequencies[rule.freq]]))
+        values.append(("FREQ", [Rule.frequencies[rule.freq]]))
 
         if rule.interval != 1:
-            values.append((u'INTERVAL', [str(int(rule.interval))]))
+            values.append(("INTERVAL", [str(int(rule.interval))]))
         if rule.wkst:
-            values.append((u'WKST', [Rule.weekdays[getattr(rule.wkst, 'number', rule.wkst)]]))
+            values.append(
+                ("WKST", [Rule.weekdays[getattr(rule.wkst, "number", rule.wkst)]])
+            )
 
         if rule.count is not None:
-            values.append((u'COUNT', [str(rule.count)]))
+            values.append(("COUNT", [str(rule.count)]))
         elif rule.until is not None:
-            values.append((u'UNTIL', [serialize_dt(rule.until)]))
+            values.append(("UNTIL", [serialize_dt(rule.until)]))
 
         if rule.byday:
             days = []
@@ -893,19 +963,19 @@ def serialize(rule_or_recurrence):
                 # does - perhaps we should refactor it into a __str__
                 # method on Weekday?
                 if d.index:
-                    days.append(u'%s%s' % (d.index, Rule.weekdays[d.number]))
+                    days.append("%s%s" % (d.index, Rule.weekdays[d.number]))
                 else:
                     days.append(Rule.weekdays[d.number])
-            values.append((u'BYDAY', days))
+            values.append(("BYDAY", days))
 
         remaining_params = list(Rule.byparams)
-        remaining_params.remove('byday')
+        remaining_params.remove("byday")
         for param in remaining_params:
             value_list = getattr(rule, param, None)
             if value_list:
                 values.append((param.upper(), [str(n) for n in value_list]))
 
-        return u';'.join(u'%s=%s' % (i[0], u','.join(i[1])) for i in values)
+        return ";".join("%s=%s" % (i[0], ",".join(i[1])) for i in values)
 
     if rule_or_recurrence is None:
         return None
@@ -922,21 +992,21 @@ def serialize(rule_or_recurrence):
     items = []
 
     if obj.dtstart:
-        items.append((u'DTSTART', serialize_dt(obj.dtstart)))
+        items.append(("DTSTART", serialize_dt(obj.dtstart)))
     if obj.dtend:
-        items.append((u'DTEND', serialize_dt(obj.dtend)))
+        items.append(("DTEND", serialize_dt(obj.dtend)))
 
     for rrule in obj.rrules:
-        items.append((u'RRULE', serialize_rule(rrule)))
+        items.append(("RRULE", serialize_rule(rrule)))
     for exrule in obj.exrules:
-        items.append((u'EXRULE', serialize_rule(exrule)))
+        items.append(("EXRULE", serialize_rule(exrule)))
 
     for rdate in obj.rdates:
-        items.append((u'RDATE', serialize_dt(rdate)))
+        items.append(("RDATE", serialize_dt(rdate)))
     for exdate in obj.exdates:
-        items.append((u'EXDATE', serialize_dt(exdate)))
+        items.append(("EXDATE", serialize_dt(exdate)))
 
-    return u'\n'.join(u'%s:%s' % i for i in items)
+    return "\n".join("%s:%s" % i for i in items)
 
 
 def deserialize(text, include_dtstart=True):
@@ -965,6 +1035,7 @@ def deserialize(text, include_dtstart=True):
     :Returns:
         A `Recurrence` instance.
     """
+
     def deserialize_dt(text):
         """
         Deserialize a rfc2445 text to a datetime.
@@ -981,18 +1052,21 @@ def deserialize(text, include_dtstart=True):
         try:
             year, month, day = int(text[:4]), int(text[4:6]), int(text[6:8])
         except ValueError:
-            raise exceptions.DeserializationError('malformed date-time: %r' % text)
-        if u'T' in text:
+            raise exceptions.DeserializationError("malformed date-time: %r" % text)
+        if "T" in text:
             # time is also specified
             try:
                 hour, minute, second = (
-                    int(text[9:11]), int(text[11:13]), int(text[13:15]))
+                    int(text[9:11]),
+                    int(text[11:13]),
+                    int(text[13:15]),
+                )
             except ValueError:
-                raise exceptions.DeserializationError('malformed date-time: %r' % text)
+                raise exceptions.DeserializationError("malformed date-time: %r" % text)
         else:
             # only date is specified, use midnight
             hour, minute, second = (0, 0, 0)
-        if u'Z' in text:
+        if "Z" in text:
             # time is in utc
             tzinfo = tz.UTC
         else:
@@ -1001,8 +1075,7 @@ def deserialize(text, include_dtstart=True):
             # just use the time zone specified in the Django settings.
             tzinfo = get_current_timezone()
 
-        dt = datetime.datetime(
-            year, month, day, hour, minute, second, tzinfo=tzinfo)
+        dt = datetime.datetime(year, month, day, hour, minute, second, tzinfo=tzinfo)
 
         if settings.deserialize_tz():
             return dt
@@ -1011,71 +1084,81 @@ def deserialize(text, include_dtstart=True):
 
         # set tz to settings.TIME_ZONE and return offset-naive datetime
         return datetime.datetime(
-            dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
+            dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second
+        )
 
     dtstart, dtend, rrules, exrules, rdates, exdates = None, None, [], [], [], []
 
     tokens = re.compile(
-        u'(DTSTART|DTEND|RRULE|EXRULE|RDATE|EXDATE)[^:]*:(.*)',
-        re.MULTILINE).findall(text)
+        "(DTSTART|DTEND|RRULE|EXRULE|RDATE|EXDATE)[^:]*:(.*)", re.MULTILINE
+    ).findall(text)
 
     if not tokens and text:
-        raise exceptions.DeserializationError('malformed data')
+        raise exceptions.DeserializationError("malformed data")
 
     for label, param_text in tokens:
         if not param_text:
-            raise exceptions.DeserializationError('empty property: %r' % label)
+            raise exceptions.DeserializationError("empty property: %r" % label)
 
-        if label in (u'RRULE', u'EXRULE'):
+        if label in ("RRULE", "EXRULE"):
             params = {}
-            param_tokens = filter(lambda p: p, param_text.split(u';'))
+            param_tokens = filter(lambda p: p, param_text.split(";"))
             for item in param_tokens:
                 try:
                     param_name, param_value = map(
-                        lambda i: i.strip(), item.split(u'=', 1))
+                        lambda i: i.strip(), item.split("=", 1)
+                    )
                 except ValueError:
                     raise exceptions.DeserializationError(
-                        'missing parameter value: %r' % item)
-                params[param_name] = list(map(
-                    lambda i: i.strip(), param_value.split(u',')))
+                        "missing parameter value: %r" % item
+                    )
+                params[param_name] = list(
+                    map(lambda i: i.strip(), param_value.split(","))
+                )
 
             kwargs = {}
             for key, value in params.items():
-                if key == u'FREQ':
+                if key == "FREQ":
                     try:
-                        kwargs[str(key.lower())] = list(
-                            Rule.frequencies).index(value[0])
+                        kwargs[str(key.lower())] = list(Rule.frequencies).index(
+                            value[0]
+                        )
                     except ValueError:
                         raise exceptions.DeserializationError(
-                            'bad frequency value: %r' % value[0])
-                elif key == u'INTERVAL':
+                            "bad frequency value: %r" % value[0]
+                        )
+                elif key == "INTERVAL":
                     try:
                         kwargs[str(key.lower())] = int(value[0])
                     except ValueError:
                         raise exceptions.DeserializationError(
-                            'bad interval value: %r' % value[0])
-                elif key == u'WKST':
+                            "bad interval value: %r" % value[0]
+                        )
+                elif key == "WKST":
                     try:
                         kwargs[str(key.lower())] = to_weekday(value[0]).number
                     except ValueError:
                         raise exceptions.DeserializationError(
-                            'bad weekday value: %r' % value[0])
-                elif key == u'COUNT':
+                            "bad weekday value: %r" % value[0]
+                        )
+                elif key == "COUNT":
                     try:
                         kwargs[str(key.lower())] = int(value[0])
                     except ValueError:
                         raise exceptions.DeserializationError(
-                            'bad count value: %r' % value[0])
-                elif key == u'UNTIL':
+                            "bad count value: %r" % value[0]
+                        )
+                elif key == "UNTIL":
                     kwargs[str(key.lower())] = deserialize_dt(value[0])
-                elif key == u'BYDAY':
+                elif key == "BYDAY":
                     bydays = []
                     for v in value:
                         try:
                             bydays.append(to_weekday(v))
                         except ValueError:
                             raise exceptions.DeserializationError(
-                                'bad weekday value: %r' % v)
+                                "bad weekday value: %r" % v
+                            )
                     kwargs[str(key.lower())] = bydays
                 elif key.lower() in Rule.byparams:
                     numbers = []
@@ -1084,25 +1167,27 @@ def deserialize(text, include_dtstart=True):
                             numbers.append(int(v))
                         except ValueError:
                             raise exceptions.DeserializationError(
-                                'bad value: %r' % value)
+                                "bad value: %r" % value
+                            )
                     kwargs[str(key.lower())] = numbers
                 else:
-                    raise exceptions.DeserializationError('bad parameter: %s' % key)
-            if 'freq' not in kwargs:
+                    raise exceptions.DeserializationError("bad parameter: %s" % key)
+            if "freq" not in kwargs:
                 raise exceptions.DeserializationError(
-                    'frequency parameter missing from rule')
-            if label == u'RRULE':
+                    "frequency parameter missing from rule"
+                )
+            if label == "RRULE":
                 rrules.append(Rule(**kwargs))
             else:
                 exrules.append(Rule(**kwargs))
-        elif label == u'DTSTART':
+        elif label == "DTSTART":
             dtstart = deserialize_dt(param_text)
-        elif label == u'DTEND':
+        elif label == "DTEND":
             dtend = deserialize_dt(param_text)
-        elif label == u'RDATE':
+        elif label == "RDATE":
             rdates.append(deserialize_dt(param_text))
-        elif label == u'EXDATE':
-            for item in param_text.split(','):
+        elif label == "EXDATE":
+            for item in param_text.split(","):
                 exdates.append(deserialize_dt(item))
 
     return Recurrence(dtstart, dtend, rrules, exrules, rdates, exdates, include_dtstart)
@@ -1117,63 +1202,101 @@ def rule_to_text(rule, short=False):
             Use abbreviated labels, i.e. 'Fri' instead of 'Friday'.
     """
     frequencies = (
-        _('annually'), _('monthly'), _('weekly'), _('daily'),
-        _('hourly'), _('minutely'), _('secondly'),
+        _("annually"),
+        _("monthly"),
+        _("weekly"),
+        _("daily"),
+        _("hourly"),
+        _("minutely"),
+        _("secondly"),
     )
     timeintervals = (
-        _('years'), _('months'), _('weeks'), _('days'),
-        _('hours'), _('minutes'), _('seconds'),
+        _("years"),
+        _("months"),
+        _("weeks"),
+        _("days"),
+        _("hours"),
+        _("minutes"),
+        _("seconds"),
     )
 
     if short:
         positional_display = {
-            1: _('1st %(weekday)s'),
-            2: _('2nd %(weekday)s'),
-            3: _('3rd %(weekday)s'),
-            -1: _('last %(weekday)s'),
-            -2: _('2nd last %(weekday)s'),
-            -3: _('3rd last %(weekday)s'),
+            1: _("1st %(weekday)s"),
+            2: _("2nd %(weekday)s"),
+            3: _("3rd %(weekday)s"),
+            -1: _("last %(weekday)s"),
+            -2: _("2nd last %(weekday)s"),
+            -3: _("3rd last %(weekday)s"),
         }
         last_of_month_display = {
-            -1: _('last'),
-            -2: _('2nd last'),
-            -3: _('3rd last'),
-            -4: _('4th last'),
+            -1: _("last"),
+            -2: _("2nd last"),
+            -3: _("3rd last"),
+            -4: _("4th last"),
         }
         weekdays_display = (
-            _('Mon'), _('Tue'), _('Wed'),
-            _('Thu'), _('Fri'), _('Sat'), _('Sun'),
+            _("Mon"),
+            _("Tue"),
+            _("Wed"),
+            _("Thu"),
+            _("Fri"),
+            _("Sat"),
+            _("Sun"),
         )
         months_display = (
-            _('Jan'), _('Feb'), _('Mar'), _('Apr'),
-            _p('month name', 'May'), _('Jun'), _('Jul'), _('Aug'),
-            _('Sep'), _('Oct'), _('Nov'), _('Dec'),
+            _("Jan"),
+            _("Feb"),
+            _("Mar"),
+            _("Apr"),
+            _p("month name", "May"),
+            _("Jun"),
+            _("Jul"),
+            _("Aug"),
+            _("Sep"),
+            _("Oct"),
+            _("Nov"),
+            _("Dec"),
         )
 
     else:
         positional_display = {
-            1: _('first %(weekday)s'),
-            2: _('second %(weekday)s'),
-            3: _('third %(weekday)s'),
-            4: _('fourth %(weekday)s'),
-            -1: _('last %(weekday)s'),
-            -2: _('second last %(weekday)s'),
-            -3: _('third last %(weekday)s'),
+            1: _("first %(weekday)s"),
+            2: _("second %(weekday)s"),
+            3: _("third %(weekday)s"),
+            4: _("fourth %(weekday)s"),
+            -1: _("last %(weekday)s"),
+            -2: _("second last %(weekday)s"),
+            -3: _("third last %(weekday)s"),
         }
         last_of_month_display = {
-            -1: _('last'),
-            -2: _('second last'),
-            -3: _('third last'),
-            -4: _('fourth last'),
+            -1: _("last"),
+            -2: _("second last"),
+            -3: _("third last"),
+            -4: _("fourth last"),
         }
         weekdays_display = (
-            _('Monday'), _('Tuesday'), _('Wednesday'),
-            _('Thursday'), _('Friday'), _('Saturday'), _('Sunday'),
+            _("Monday"),
+            _("Tuesday"),
+            _("Wednesday"),
+            _("Thursday"),
+            _("Friday"),
+            _("Saturday"),
+            _("Sunday"),
         )
         months_display = (
-            _('January'), _('February'), _('March'), _('April'),
-            _p('month name', 'May'), _('June'), _('July'), _('August'),
-            _('September'), _('October'), _('November'), _('December'),
+            _("January"),
+            _("February"),
+            _("March"),
+            _("April"),
+            _p("month name", "May"),
+            _("June"),
+            _("July"),
+            _("August"),
+            _("September"),
+            _("October"),
+            _("November"),
+            _("December"),
         )
 
     def get_positional_weekdays(rule):
@@ -1183,24 +1306,25 @@ def rule_to_text(rule, short=False):
                 for byday in rule.byday:
                     byday = to_weekday(byday)
                     items.append(
-                        positional_display.get(setpos) % {
-                            'weekday': weekdays_display[byday.number]})
+                        positional_display.get(setpos)
+                        % {"weekday": weekdays_display[byday.number]}
+                    )
         elif rule.byday:
             for byday in rule.byday:
                 byday = to_weekday(byday)
                 items.append(
-                    positional_display.get(byday.index, '%(weekday)s') % {
-                        'weekday': weekdays_display[byday.number]})
-        return _(', ').join(items)
+                    positional_display.get(byday.index, "%(weekday)s")
+                    % {"weekday": weekdays_display[byday.number]}
+                )
+        return _(", ").join(items)
 
     parts = []
 
     if rule.interval > 1:
         parts.append(
-            _('every %(number)s %(freq)s') % {
-                'number': rule.interval,
-                'freq': timeintervals[rule.freq]
-            })
+            _("every %(number)s %(freq)s")
+            % {"number": rule.interval, "freq": timeintervals[rule.freq]}
+        )
     else:
         parts.append(frequencies[rule.freq])
 
@@ -1208,49 +1332,56 @@ def rule_to_text(rule, short=False):
         if rule.bymonth:
             # bymonths are 1-indexed (January is 1), months_display
             # are 0-indexed (January is 0).
-            items = _(', ').join(
-                [months_display[month] for month in
-                 [month_index - 1 for month_index in rule.bymonth]])
-            parts.append(_('each %(items)s') % {'items': items})
+            items = _(", ").join(
+                [
+                    months_display[month]
+                    for month in [month_index - 1 for month_index in rule.bymonth]
+                ]
+            )
+            parts.append(_("each %(items)s") % {"items": items})
         if rule.byday or rule.bysetpos:
             parts.append(
-                _('on the %(items)s') % {
-                    'items': get_positional_weekdays(rule)})
+                _("on the %(items)s") % {"items": get_positional_weekdays(rule)}
+            )
 
     if rule.freq == MONTHLY:
         if rule.bymonthday:
-            items = _(', ').join([
-                dateformat.format(datetime.datetime(1, 1, day), 'jS') if day > 0
-                else last_of_month_display.get(day, day)
-                for day in rule.bymonthday])
-            parts.append(_('on the %(items)s') % {'items': items})
+            items = _(", ").join(
+                [
+                    dateformat.format(datetime.datetime(1, 1, day), "jS")
+                    if day > 0
+                    else last_of_month_display.get(day, day)
+                    for day in rule.bymonthday
+                ]
+            )
+            parts.append(_("on the %(items)s") % {"items": items})
         elif rule.byday:
             if rule.byday or rule.bysetpos:
                 parts.append(
-                    _('on the %(items)s') % {
-                        'items': get_positional_weekdays(rule)})
+                    _("on the %(items)s") % {"items": get_positional_weekdays(rule)}
+                )
 
     if rule.freq == WEEKLY:
         if rule.byday:
-            items = _(', ').join([
-                weekdays_display[to_weekday(day).number]
-                for day in rule.byday])
-            parts.append(_('each %(items)s') % {'items': items})
+            items = _(", ").join(
+                [weekdays_display[to_weekday(day).number] for day in rule.byday]
+            )
+            parts.append(_("each %(items)s") % {"items": items})
 
     # daily freqencies has no additional formatting,
     # hour/minute/second formatting not supported
 
     if rule.count:
         if rule.count == 1:
-            parts.append(_('occuring once'))
+            parts.append(_("occuring once"))
         else:
-            parts.append(_('occuring %(number)s times') % {
-                'number': rule.count})
+            parts.append(_("occuring %(number)s times") % {"number": rule.count})
     elif rule.until:
-        parts.append(_('until %(date)s') % {
-            'date': dateformat.format(rule.until, 'Y-m-d')})
+        parts.append(
+            _("until %(date)s") % {"date": dateformat.format(rule.until, "Y-m-d")}
+        )
 
-    return _(', ').join(parts)
+    return _(", ").join(parts)
 
 
 def normalize_offset_awareness(dt, from_dt=None):
@@ -1278,13 +1409,11 @@ def normalize_offset_awareness(dt, from_dt=None):
         dt = make_aware(dt)
     elif is_aware(dt):
         dt = dt.astimezone(get_current_timezone())
-        dt = datetime.datetime(
-            dt.year, dt.month, dt.day,
-            dt.hour, dt.minute, dt.second)
+        dt = datetime.datetime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
     return dt
 
 
-def from_dateutil_rrule(rrule):
+def from_dateutil_rrule(rrule: dateutil.rrule.rrule) -> Rule:
     """
     Convert a `dateutil.rrule.rrule` instance to a `Rule` instance.
 
@@ -1292,20 +1421,22 @@ def from_dateutil_rrule(rrule):
         A `Rrule` instance.
     """
     kwargs = {}
-    kwargs['freq'] = rrule._freq
-    kwargs['interval'] = rrule._interval
+    kwargs["freq"] = rrule._freq
+    kwargs["interval"] = rrule._interval
     if rrule._wkst != 0:
-        kwargs['wkst'] = rrule._wkst
-    kwargs['bysetpos'] = rrule._bysetpos
+        kwargs["wkst"] = rrule._wkst
+    kwargs["bysetpos"] = rrule._bysetpos
     if rrule._count is not None:
-        kwargs['count'] = rrule._count
+        kwargs["count"] = rrule._count
     elif rrule._until is not None:
-        kwargs['until'] = rrule._until
+        kwargs["until"] = rrule._until
 
     days = []
-    if (rrule._byweekday is not None and (
-        WEEKLY != rrule._freq or len(rrule._byweekday) != 1 or
-        rrule._dtstart.weekday() != rrule._byweekday[0])):
+    if rrule._byweekday is not None and (
+        rrule._freq != WEEKLY
+        or len(rrule._byweekday) != 1
+        or rrule._dtstart.weekday() != rrule._byweekday[0]
+    ):
         # ignore byweekday if freq is WEEKLY and day correlates
         # with dtstart because it was automatically set by
         # dateutil
@@ -1315,46 +1446,56 @@ def from_dateutil_rrule(rrule):
         days.extend(Weekday(*n) for n in rrule._bynweekday)
 
     if len(days) > 0:
-        kwargs['byday'] = days
+        kwargs["byday"] = days
 
     if rrule._bymonthday is not None and len(rrule._bymonthday) > 0:
-        if not (rrule._freq <= MONTHLY and len(rrule._bymonthday) == 1 and
-                rrule._bymonthday[0] == rrule._dtstart.day):
+        if not (
+            rrule._freq <= MONTHLY
+            and len(rrule._bymonthday) == 1
+            and rrule._bymonthday[0] == rrule._dtstart.day
+        ):
             # ignore bymonthday if it's generated by dateutil
-            kwargs['bymonthday'] = list(rrule._bymonthday)
+            kwargs["bymonthday"] = list(rrule._bymonthday)
 
     if rrule._bynmonthday is not None and len(rrule._bynmonthday) > 0:
-        kwargs.setdefault('bymonthday', []).extend(rrule._bynmonthday)
+        kwargs.setdefault("bymonthday", []).extend(rrule._bynmonthday)
 
     if rrule._bymonth is not None and len(rrule._bymonth) > 0:
-        if (rrule._byweekday is not None or
-            len(rrule._bynweekday or ()) > 0 or not (
-            rrule._freq == YEARLY and len(rrule._bymonth) == 1 and
-            rrule._bymonth[0] == rrule._dtstart.month)):
+        if (
+            rrule._byweekday is not None
+            or len(rrule._bynweekday or ()) > 0
+            or not (
+                rrule._freq == YEARLY
+                and len(rrule._bymonth) == 1
+                and rrule._bymonth[0] == rrule._dtstart.month
+            )
+        ):
             # ignore bymonth if it's generated by dateutil
-            kwargs['bymonth'] = list(rrule._bymonth)
+            kwargs["bymonth"] = list(rrule._bymonth)
 
     if rrule._byyearday is not None:
-        kwargs['byyearday'] = list(rrule._byyearday)
+        kwargs["byyearday"] = list(rrule._byyearday)
     if rrule._byweekno is not None:
-        kwargs['byweekno'] = list(rrule._byweekno)
+        kwargs["byweekno"] = list(rrule._byweekno)
 
-    kwargs['byhour'] = list(rrule._byhour)
-    kwargs['byminute'] = list(rrule._byminute)
-    kwargs['bysecond'] = list(rrule._bysecond)
-    if (rrule._dtstart.hour in rrule._byhour and
-        rrule._dtstart.minute in rrule._byminute and
-        rrule._dtstart.second in rrule._bysecond):
+    kwargs["byhour"] = list(rrule._byhour)
+    kwargs["byminute"] = list(rrule._byminute)
+    kwargs["bysecond"] = list(rrule._bysecond)
+    if (
+        rrule._dtstart.hour in rrule._byhour
+        and rrule._dtstart.minute in rrule._byminute
+        and rrule._dtstart.second in rrule._bysecond
+    ):
         # ignore byhour/byminute/bysecond automatically set by
         # dateutil from dtstart
-        kwargs['byhour'].remove(rrule._dtstart.hour)
-        kwargs['byminute'].remove(rrule._dtstart.minute)
-        kwargs['bysecond'].remove(rrule._dtstart.second)
+        kwargs["byhour"].remove(rrule._dtstart.hour)
+        kwargs["byminute"].remove(rrule._dtstart.minute)
+        kwargs["bysecond"].remove(rrule._dtstart.second)
 
     return Rule(**kwargs)
 
 
-def from_dateutil_rruleset(rruleset):
+def from_dateutil_rruleset(rruleset: dateutil.rrule.rruleset) -> Recurrence:
     """
     Convert a `dateutil.rrule.rruleset` instance to a `Recurrence`
     instance.
@@ -1374,4 +1515,6 @@ def from_dateutil_rruleset(rruleset):
     else:
         dtstart = None
 
-    return Recurrence(dtstart, rrules, exrules, rdates, exdates)
+    return Recurrence(
+        dtstart=dtstart, rrules=rrules, exrules=exrules, rdates=rdates, exdates=exdates
+    )
